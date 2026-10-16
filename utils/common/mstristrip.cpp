@@ -31,6 +31,8 @@
 #endif
 
 #include "mstristrip.h"
+#include <cstring>
+#include <climits>
 
 using namespace std;
 

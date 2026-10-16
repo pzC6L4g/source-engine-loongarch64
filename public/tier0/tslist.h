@@ -53,7 +53,14 @@ inline bool ThreadInterlockedAssignIf128( int128 volatile * pDest, const int128 
     // We do not want the original comparand modified by the swap
     // so operate on a local copy.
     int128 local_comparand = comparand;
-	return __sync_bool_compare_and_swap( pDest, local_comparand, value );
+    // Use the __atomic builtins rather than the legacy __sync ones. On targets
+    // with a native 16-byte CAS (x86-64 cmpxchg16b, aarch64 casp) this inlines;
+    // on targets without one (e.g. LoongArch, which lacks 128-bit atomics) it
+    // routes through libatomic's lock-based implementation so it still links
+    // and remains correct.
+    return __atomic_compare_exchange_n( (int128 volatile *)pDest, &local_comparand,
+                                        value, false,
+                                        __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST );
 }
 #endif
 

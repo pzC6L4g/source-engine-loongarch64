@@ -94,7 +94,7 @@ bool g_bOnlyStaticProps = false;
 bool g_bShowStaticPropNormals = false;
 
 
-float		gamma = 0.5;
+float		g_Gamma = 0.5;
 float		indirect_sun = 1.0;
 float		reflectivityScale = 1.0;
 qboolean	do_extra = true;
@@ -2099,7 +2099,11 @@ FileHandle_t pFileSamples[4][4];
 
 void LoadPhysicsDLL( void )
 {
+#ifdef _WIN32
 	PhysicsDLLPath( "VPHYSICS.DLL" );
+else
+	PhysicsDLLPath( "vphysics" );
+#endif
 }
 
 
@@ -2147,7 +2151,10 @@ void VRAD_LoadBSP( char const *pFilename )
 	{
 		// Setup the logfile.
 		char logFile[512];
-		_snprintf( logFile, sizeof(logFile), "%s.log", source );
+		// _snprintf( logFile, sizeof(logFile), "%s.log", source );
+		V_strncpy( logFile, source, sizeof( logFile ) );
+		V_StripExtension( logFile, logFile, sizeof( logFile ) );
+		V_strncat( logFile, ".log", sizeof( logFile ) );
 		SetSpewFunctionLogFile( logFile );
 	}
 
@@ -2160,7 +2167,7 @@ void VRAD_LoadBSP( char const *pFilename )
 		// Otherwise, try looking in the BIN directory from which we were run from
 		Msg( "Could not find lights.rad in %s.\nTrying VRAD BIN directory instead...\n", 
 			    global_lights );
-		GetModuleFileName( NULL, global_lights, sizeof( global_lights ) );
+		Plat_GetModuleFilename( global_lights, sizeof( global_lights ) );
 		Q_ExtractFilePath( global_lights, global_lights, sizeof( global_lights ) );
 		strcat( global_lights, "lights.rad" );
 	}

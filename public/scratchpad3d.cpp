@@ -631,5 +631,48 @@ IScratchPad3D* ScratchPad3D_Create( char const *pFilename )
 	CScratchPad3D *pRet = new CScratchPad3D( pFilename, pFileSystem, true );
 	return pRet;
 }
+
+#else // !POSIX - non-Windows has no Direct3D-based scratchpad viewer; provide a
+      // no-op implementation so the tools still link and run correctly.
+
+class CNullScratchPad3D : public IScratchPad3D
+{
+public:
+	virtual void Release() { delete this; }
+
+	virtual void SetMapping( Vector const &vInputMin, Vector const &vInputMax,
+		Vector const &vOutputMin, Vector const &vOutputMax ) {}
+
+	virtual bool GetAutoFlush() { return false; }
+	virtual void SetAutoFlush( bool bAutoFlush ) {}
+
+	virtual void DrawPoint( CSPVert const &v, float flPointSize ) {}
+	virtual void DrawLine( CSPVert const &v1, CSPVert const &v2 ) {}
+	virtual void DrawPolygon( CSPVertList const &verts ) {}
+
+	virtual void DrawRectYZ( float xPos, Vector2D const &vMin, Vector2D const &vMax, CSPColor const &vColor ) {}
+	virtual void DrawRectXZ( float yPos, Vector2D const &vMin, Vector2D const &vMax, CSPColor const &vColor ) {}
+	virtual void DrawRectXY( float zPos, Vector2D const &vMin, Vector2D const &vMax, CSPColor const &vColor ) {}
+
+	virtual void DrawWireframeBox( Vector const &vMin, Vector const &vMax, Vector const &vColor ) {}
+
+	virtual void DrawText( char const *pStr, CTextParams const &params ) {}
+
+	virtual void SetRenderState( RenderState state, unsigned long val ) {}
+
+	virtual void Clear() {}
+	virtual void Flush() {}
+
+	virtual void DrawImageBW( unsigned char const *pData, int width, int height,
+		int pitchInBytes, bool bOutlinePixels, bool bOutlineImage, Vector *vCorners ) {}
+	virtual void DrawImageRGBA( SPRGBA *pData, int width, int height,
+		int pitchInBytes, bool bOutlinePixels, bool bOutlineImage, Vector *vCorners ) {}
+};
+
+IScratchPad3D* ScratchPad3D_Create( char const *pFilename )
+{
+	return new CNullScratchPad3D;
+}
+
 #endif // POSIX
 

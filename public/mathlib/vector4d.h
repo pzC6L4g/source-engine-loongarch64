@@ -25,6 +25,8 @@
 
 #if defined (__arm__) || defined(__aarch64__)
 #include "sse2neon.h"
+#elif defined(__loongarch__)
+#include "sse2lsx.h"	// SSE -> LoongArch LSX translation layer
 #endif
 
 // forward declarations

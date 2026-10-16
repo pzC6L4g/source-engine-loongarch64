@@ -767,7 +767,7 @@ bool CSourceAppSystemGroup::Create()
 
 bool CSourceAppSystemGroup::PreInit()
 {
-	if ( !CommandLine()->FindParm( "-nolog" ) )
+	if ( CommandLine()->FindParm( "-log" ) )//-nolog
 		DebugLogger()->Init("engine.log");
 	else
 		DebugLogger()->Disable();

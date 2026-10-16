@@ -8,14 +8,18 @@
 // vvis_launcher.cpp : Defines the entry point for the console application.
 //
 
-#include "stdafx.h"
+#include "StdAfx.h"
+#ifdef _WIN32
 #include <direct.h>
+#else
+#include <unistd.h>
+#endif
 #include "tier1/strtools.h"
 #include "tier0/icommandline.h"
 #include "ilaunchabledll.h"
 
 
-
+#ifdef _WIN32
 char* GetLastErrorString()
 {
 	static char err[2048];
@@ -40,7 +44,31 @@ char* GetLastErrorString()
 
 	return err;
 }
+#else // POSIX / Linux
+#include <dlfcn.h>
+#include <string.h>
+#include <errno.h>
 
+char* GetLastErrorString()
+{
+	static char err[2048];
+
+	// Prefer the dynamic loader's message (set by Sys_LoadModule -> dlopen).
+	const char *pErr = dlerror();
+	if ( pErr && *pErr )
+	{
+		Q_strncpy( err, pErr, sizeof( err ) );
+	}
+	else
+	{
+		Q_strncpy( err, strerror( errno ), sizeof( err ) );
+	}
+
+	err[ sizeof( err ) - 1 ] = 0;
+
+	return err;
+}
+#endif
 
 int main(int argc, char* argv[])
 {

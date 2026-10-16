@@ -3,7 +3,17 @@
 #include "map_shared.h"
 #include "fgdlib/fgdlib.h"
 #include "manifest.h"
+#ifdef _WIN32
 #include "windows.h"
+#else
+// POSIX equivalents for the username lookup used by LoadVMFManifestUserPrefs.
+#include <pwd.h>
+#include <unistd.h>
+#include <sys/types.h>
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: default constructor
@@ -356,15 +366,32 @@ bool CManifest::LoadSubMaps( CMapFile *pMapFile, const char *pszFileName )
 bool CManifest::LoadVMFManifestUserPrefs( const char *pszFileName )
 {
 	char		UserName[ MAX_PATH ], FileName[ MAX_PATH ], UserPrefsFileName[ MAX_PATH ];
-	DWORD		UserNameSize;
 
-	UserNameSize = sizeof( UserName );
+#ifdef _WIN32
+	DWORD		UserNameSize = sizeof( UserName );
 	if ( GetUserName( UserName, &UserNameSize ) == 0 )
 	{
 		strcpy( UserPrefsFileName, "default" );
 	}
+#else
+	// POSIX: look up the current user name via the real UID (more reliable
+	// than getlogin() when there is no controlling terminal).
+	struct passwd *pw = getpwuid( getuid() );
+	if ( pw && pw->pw_name )
+	{
+		Q_strncpy( UserName, pw->pw_name, sizeof( UserName ) );
+	}
+	else
+	{
+		strcpy( UserName, "default" );
+	}
+#endif
 
+#ifdef _WIN32
 	sprintf( UserPrefsFileName, "\\%s.vmm_prefs", UserName );
+#else
+	sprintf( UserPrefsFileName, "/%s.vmm_prefs", UserName );
+#endif
 	V_StripExtension( pszFileName, FileName, sizeof( FileName ) );
 	strcat( FileName, UserPrefsFileName );
 
@@ -422,7 +449,11 @@ bool CManifest::LoadVMFManifestUserPrefs( const char *pszFileName )
 bool CManifest::LoadVMFManifest( const char *pszFileName )
 {
 	V_StripExtension( pszFileName, m_InstancePath, sizeof( m_InstancePath ) );
+#ifdef _WIN32
 	strcat( m_InstancePath, "\\" );
+#else
+	strcat( m_InstancePath, "/" );
+#endif
 
 	CChunkFile File;
 	ChunkFileResult_t eResult = File.Open( pszFileName, ChunkFile_Read );

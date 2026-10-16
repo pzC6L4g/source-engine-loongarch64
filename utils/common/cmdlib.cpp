@@ -231,7 +231,7 @@ SpewRetval_t CmdLib_SpewOutputFunc( SpewType_t type, char const *pMsg )
 
 	WORD old;
 	SpewRetval_t retVal;
-	
+
 	EnterCriticalSection( &g_SpewCS );
 	{
 		if (( type == SPEW_MESSAGE ) || (type == SPEW_LOG ))
@@ -277,7 +277,7 @@ SpewRetval_t CmdLib_SpewOutputFunc( SpewType_t type, char const *pMsg )
 					);
 
 					// Never get here (non-continuable exception)
-				
+
 				VMPI_HandleCrash( pMsg, NULL, true );
 				exit( 0 );
 			}
@@ -298,7 +298,7 @@ SpewRetval_t CmdLib_SpewOutputFunc( SpewType_t type, char const *pMsg )
 			printf( "%s", pMsg );
 
 		OutputDebugString( pMsg );
-		
+
 		if ( type == SPEW_ERROR )
 		{
 			printf( "\n" );
@@ -327,7 +327,6 @@ SpewRetval_t CmdLib_SpewOutputFunc( SpewType_t type, char const *pMsg )
 	return retVal;
 }
 
-
 void InstallSpewFunction()
 {
 	setvbuf( stdout, NULL, _IONBF, 0 );
@@ -337,6 +336,17 @@ void InstallSpewFunction()
 	GetInitialColors();
 }
 
+void SetSpewFunctionLogFile( char const *pFilename )
+{
+	Assert( (!g_pLogFile) );
+	g_pLogFile = g_pFileSystem->Open( pFilename, "a" );
+
+	Assert( g_pLogFile );
+	if (!g_pLogFile)
+		Error("Can't create LogFile:\"%s\"\n", pFilename );
+
+	CmdLib_FPrintf( g_pLogFile, "\n\n\n" );
+}
 
 void InstallExtraSpewHook( SpewHookFn pFn )
 {
@@ -357,24 +367,33 @@ int CmdLib_NewHandler( size_t size )
 }
 #endif
 
+
+
+
+void CmdLib_AtCleanup( CleanupFn pFn )
+{
+	g_CleanupFunctions.AddToTail( pFn );
+}
+
+
+
+void CmdLib_Exit( int exitCode )
+{
+	TerminateProcess( GetCurrentProcess(), 1 );
+}	
+
+
+
+#endif
+
+#endif
+
+
 void InstallAllocationFunctions()
 {
 //	_set_new_mode( 1 ); // so if malloc() fails, we exit.
 //	_set_new_handler( CmdLib_NewHandler );
 }
-
-void SetSpewFunctionLogFile( char const *pFilename )
-{
-	Assert( (!g_pLogFile) );
-	g_pLogFile = g_pFileSystem->Open( pFilename, "a" );
-
-	Assert( g_pLogFile );
-	if (!g_pLogFile)
-		Error("Can't create LogFile:\"%s\"\n", pFilename );
-
-	CmdLib_FPrintf( g_pLogFile, "\n\n\n" );
-}
-
 
 void CloseSpewFunctionLogFile()
 {
@@ -384,13 +403,6 @@ void CloseSpewFunctionLogFile()
 		g_pLogFile = FILESYSTEM_INVALID_HANDLE;
 	}
 }
-
-
-void CmdLib_AtCleanup( CleanupFn pFn )
-{
-	g_CleanupFunctions.AddToTail( pFn );
-}
-
 
 void CmdLib_Cleanup()
 {
@@ -410,20 +422,128 @@ void CmdLib_Cleanup()
 #endif
 }
 
+#if !defined( _WIN32 ) && !defined( WIN32 )
+// POSIX implementations of the cross-platform CmdLib helpers. The Windows
+// versions are wrapped in #if defined( _WIN32 ), so they are not compiled on
+// Linux; provide the cross-platform subset here.
+// --- POSIX 版 spew 支持（对应 Windows 块内的实现）---
+static SpewRetval_t CmdLib_SpewOutputFunc( SpewType_t type, char const *pMsg )
+{
+	// 终端输出（原 Windows 版用控制台颜色，这里直接打印）
+	printf( "%s", pMsg );
+
+	// 镜像到日志文件
+	if ( g_pLogFile )
+	{
+		CmdLib_FPrintf( g_pLogFile, "%s", pMsg );
+		g_pFileSystem->Flush( g_pLogFile );
+	}
+
+	// 分发给其它 spew 钩子
+	FOR_EACH_LL( g_ExtraSpewHooks, i )
+		g_ExtraSpewHooks[i]( pMsg );
+
+	if ( type == SPEW_ERROR )
+	{
+		CmdLib_Exit( 1 );
+	}
+
+	return SPEW_CONTINUE;
+}
+
+void CmdLib_FPrintf( FileHandle_t hFile, const char *pFormat, ... )
+{
+	static CUtlVector<char> buf;
+	if ( buf.Count() == 0 )
+		buf.SetCount( 1024 );
+
+	va_list marker;
+	va_start( marker, pFormat );
+	
+	while ( 1 )
+	{
+		int ret = Q_vsnprintf( buf.Base(), buf.Count(), pFormat, marker );
+		if ( ret >= 0 )
+		{
+			g_pFileSystem->Write( buf.Base(), ret, hFile );
+			break;
+		}
+		else
+		{
+			int newSize = buf.Count() * 2;
+			buf.SetCount( newSize );
+			if ( buf.Count() != newSize )
+			{
+				Error( "CmdLib_FPrintf: can't allocate space for text." );
+			}
+		}
+	}
+
+	va_end( marker );
+}
+
+char* CmdLib_FGets( char *pOut, int outSize, FileHandle_t hFile )
+{
+	int iCur=0;
+	for ( ; iCur < (outSize-1); iCur++ )
+	{
+		char c;
+		if ( !g_pFileSystem->Read( &c, 1, hFile ) )
+		{
+			if ( iCur == 0 )
+				return NULL;
+			else
+				break;
+		}
+
+		pOut[iCur] = c;
+		if ( c == '\n' )
+			break;
+
+		if ( c == EOF )
+		{
+			if ( iCur == 0 )
+				return NULL;
+			else
+				break;
+		}
+	}
+
+	pOut[iCur] = 0;
+	return pOut;
+}
 
 void CmdLib_Exit( int exitCode )
 {
-	TerminateProcess( GetCurrentProcess(), 1 );
-}	
+	exit( exitCode );
+}
 
+void SetSpewFunctionLogFile( char const *pFilename )
+{
+	Assert( (!g_pLogFile) );
+	g_pLogFile = g_pFileSystem->Open( pFilename, "a" );
 
+	Assert( g_pLogFile );
+	if (!g_pLogFile)
+		Error("Can't create LogFile:\"%s\"\n", pFilename );
 
-#endif
+	CmdLib_FPrintf( g_pLogFile, "\n\n\n" );
+}
 
-#endif
+void InstallExtraSpewHook( SpewHookFn pFn )
+{
+	g_ExtraSpewHooks.AddToTail( pFn );
+}
 
+void InstallSpewFunction()
+{
+	setvbuf( stdout, NULL, _IONBF, 0 );
+	setvbuf( stderr, NULL, _IONBF, 0 );
 
+	SpewOutputFunc( CmdLib_SpewOutputFunc );
+}
 
+#endif // !_WIN32
 
 /*
 ===================

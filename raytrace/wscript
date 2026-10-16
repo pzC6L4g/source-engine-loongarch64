@@ -1,0 +1,55 @@
+#! /usr/bin/env python
+# encoding: utf-8
+
+from waflib import Utils
+import os
+
+top = '.'
+PROJECT_NAME = 'raytrace'
+
+def options(opt):
+	# stub
+	return
+
+def configure(conf):
+	# stub
+	pass
+
+def build(bld):
+	source = [
+		'raytrace.cpp',
+		'trace2.cpp',
+		'trace3.cpp'
+	]
+
+	includes = [
+		'.',
+		'../utils/common',
+		'../thirdparty/SDL',
+		'../common',
+		'../public',
+		'../public/tier0',
+		'../public/tier1',
+		'../lib/public',
+		'../lib/common'
+	]
+
+	defines = []
+
+	libs = ['tier0','tier1','vstdlib','mathlib']
+
+	# install_path = bld.env.LIBDIR
+
+	bld.stlib(
+		source   = source,
+		target   = PROJECT_NAME,
+		name     = PROJECT_NAME,
+		features = 'c cxx',
+		includes = includes,
+		defines  = defines,
+		use      = libs,
+		install_path = None,
+		subsystem = bld.env.MSVC_SUBSYSTEM,
+		idx      = bld.get_taskgen_count()
+	)
+

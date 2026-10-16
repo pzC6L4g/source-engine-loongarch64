@@ -13,9 +13,10 @@
 #include "mstristrip.h"
 #include "writebsp.h"
 #include "pacifier.h"
-#include "disp_ivp.h"
+// #include "disp_ivp.h"
 #include "builddisp.h"
 #include "mathlib/vector.h"
+#include "disp_tesselate.h"
 
 // map displacement info -- runs parallel to the dispinfos struct
 int              nummapdispinfo = 0;
@@ -434,6 +435,27 @@ bool FindEnclosingTri(
 
 	return false;
 }
+
+// VBSP's tesselation helper. Derives from CBaseTesselateHelper and provides the
+// TesselateHelper interface required by TesselateDisplacement (see disp_tesselate.h).
+class CVBSPTesselateHelper : public CBaseTesselateHelper
+{
+public:
+	CUtlVector<unsigned short> *m_pIndices;
+	DispNodeInfo_t m_NodeInfo[32*32];
+
+	void EndTriangle()
+	{
+		m_pIndices->AddToTail( m_TempIndices[0] );
+		m_pIndices->AddToTail( m_TempIndices[1] );
+		m_pIndices->AddToTail( m_TempIndices[2] );
+	}
+
+	DispNodeInfo_t& GetNodeInfo( int iNodeBit )
+	{
+		return m_NodeInfo[iNodeBit];
+	}
+};
 
 void SnapRemainingVertsToSurface( CCoreDispInfo *pCoreDisp, ddispinfo_t *pDispInfo )
 {

@@ -9,7 +9,7 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
-#if defined(__x86_64__) || defined(_WIN64) || defined(__aarch64__)
+#if defined(__x86_64__) || defined(_WIN64) || defined(__aarch64__) || defined(__loongarch__)
 #define PLATFORM_64BITS 1
 #endif
 
@@ -230,6 +230,12 @@ typedef signed char int8;
 	#ifdef PLATFORM_64BITS
 		typedef long long			intp;
 		typedef unsigned long long	uintp;
+		// Steams SDK (steamtypes.h) keys its intp/uintp typedefs off X64BITS;
+		// define it so its 64-bit branch (long long) matches the above and we
+		// avoid a conflicting 32-bit 'int' redefinition on LoongArch/aarch64.
+		#ifndef X64BITS
+		#define X64BITS
+		#endif
 	#else
 		typedef int					intp;
 		typedef unsigned int		uintp;
@@ -898,7 +904,7 @@ static FORCEINLINE double fsel(double fComparand, double fValGE, double fLT)
 
 		#endif
 	#endif
-#elif defined (__arm__) || defined (__aarch64__)
+#elif defined (__arm__) || defined (__aarch64__) || defined(__loongarch__)
 	inline void SetupFPUControlWord() {}
 #else
 	inline void SetupFPUControlWord()
@@ -1069,7 +1075,7 @@ inline T QWordSwapC( T dw )
 // The typically used methods.
 //-------------------------------------
 
-#if (defined(__i386__) || defined(__amd64__) || defined(__arm__) || defined(__aarch64__)) && !defined(VALVE_LITTLE_ENDIAN)
+#if (defined(__i386__) || defined(__amd64__) || defined(__arm__) || defined(__aarch64__) || defined(__loongarch__)) && !defined(VALVE_LITTLE_ENDIAN)
 #define VALVE_LITTLE_ENDIAN 1
 #endif
 
@@ -1258,6 +1264,11 @@ inline uint64 Plat_Rdtsc()
 	uint32 lo, hi;
 	__asm__ __volatile__ ( "rdtsc" : "=a" (lo), "=d" (hi));
 	return ( ( ( uint64 )hi ) << 32 ) | lo;
+#elif defined( __loongarch__ )
+	// LoongArch has no rdtsc; use the constant-rate timer via clock_gettime.
+	struct timespec t;
+	clock_gettime( CLOCK_MONOTONIC, &t );
+	return ( uint64 )t.tv_sec * 1000000000ULL + ( uint64 )t.tv_nsec;
 #else
 	#error
 #endif

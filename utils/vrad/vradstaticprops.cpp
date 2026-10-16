@@ -11,16 +11,16 @@
 
 #include "vrad.h"
 #include "mathlib/vector.h"
-#include "UtlBuffer.h"
+#include "utlbuffer.h"
 #include "utlvector.h"
-#include "GameBSPFile.h"
-#include "BSPTreeData.h"
-#include "VPhysics_Interface.h"
-#include "Studio.h"
-#include "Optimize.h"
-#include "Bsplib.h"
-#include "CModel.h"
-#include "PhysDll.h"
+#include "gamebspfile.h"
+#include "bsptreedata.h"
+#include "vphysics_interface.h"
+#include "studio.h"
+#include "optimize.h"
+#include "bsplib.h"
+#include "cmodel.h"
+#include "physdll.h"
 #include "phyfile.h"
 #include "collisionutils.h"
 #include "tier1/KeyValues.h"
@@ -165,8 +165,8 @@ void Rasterizer::Build()
 		return;
 
 	// Clamp to 0..1
-	fMinX = max(0, fMinX);
-	fMinY = max(0, fMinY);
+	fMinX = max(0.0f, fMinX);
+	fMinY = max(0.0f, fMinY);
 	fMaxX = min(1.0f, fMaxX);
 	fMaxY = min(1.0f, fMaxY);
 
@@ -182,8 +182,8 @@ void Rasterizer::Build()
 	// Clamp to valid texture (integer) locations
 	iMinX = max(0, iMinX);
 	iMinY = max(0, iMinY);
-	iMaxX = min(iMaxX, mResX - 1);
-	iMaxY = min(iMaxY, mResY - 1);
+	iMaxX = min(iMaxX, (int)(mResX - 1));
+	iMaxY = min(iMaxY, (int)(mResY - 1));
 
 	// Set the size to be as expected. 
 	// TODO: Pass this in from outside to minimize allocations
@@ -495,8 +495,8 @@ bool LoadStudioModel( char const* pModelName, CUtlBuffer& buf )
 	}
 
 	// ensure reset
-	pHdr->pVertexBase = NULL;
-	pHdr->pIndexBase  = NULL;
+	pHdr->SetVertexBase( NULL );
+	pHdr->SetIndexBase( NULL );
 
 	return true;
 }
@@ -1110,9 +1110,9 @@ void CVradStaticPropMgr::Shutdown()
 		studiohdr_t *pStudioHdr = m_StaticPropDict[i].m_pStudioHdr;
 		if ( pStudioHdr )
 		{
-			if ( pStudioHdr->pVertexBase )
+			if ( pStudioHdr->VertexBase() )
 			{
-				free( pStudioHdr->pVertexBase );
+				free( pStudioHdr->VertexBase() );
 			}
 			free( pStudioHdr );
 		}
@@ -1201,7 +1201,7 @@ void ComputeDirectLightingAtPoint( Vector &position, Vector &normal, Vector &out
 		GatherSampleLightSSE( sampleOutput, dl, -1, adjusted_pos4, &normal4, 1, iThread, nLFlags | GATHERLFLAGS_FORCE_FAST,
 		                      static_prop_id_to_skip, flEpsilon );
 		
-		VectorMA( outColor, sampleOutput.m_flFalloff.m128_f32[0] * sampleOutput.m_flDot[0].m128_f32[0], dl->light.intensity, outColor );
+		VectorMA( outColor, SubFloat( sampleOutput.m_flFalloff, 0 ) * SubFloat( sampleOutput.m_flDot[0], 0 ), dl->light.intensity, outColor );
 	}
 }
 
@@ -2169,9 +2169,9 @@ const vertexFileHeader_t * mstudiomodel_t::CacheVertexData( void *pModelData )
 	studiohdr_t *pActiveStudioHdr = static_cast<studiohdr_t *>(pModelData);
 	Assert( pActiveStudioHdr );
 
-	if ( pActiveStudioHdr->pVertexBase )
+	if ( pActiveStudioHdr->VertexBase() )
 	{
-		return (vertexFileHeader_t *)pActiveStudioHdr->pVertexBase;
+		return (vertexFileHeader_t *)pActiveStudioHdr->VertexBase();
 	}
 
 	// mandatory callback to make requested data resident
@@ -2230,7 +2230,7 @@ const vertexFileHeader_t * mstudiomodel_t::CacheVertexData( void *pModelData )
 	free( pVvdHdr );
 	pVvdHdr = pNewVvdHdr;
 
-	pActiveStudioHdr->pVertexBase = (void*)pVvdHdr;
+	pActiveStudioHdr->SetVertexBase( (void*)pVvdHdr );
 	return pVvdHdr;
 }
 
@@ -2455,8 +2455,8 @@ static int GetTexelCount(unsigned int _resX, unsigned int _resY, bool _mipmaps)
 	while (_resX > 1 || _resY > 1) 
 	{
 		retVal += _resX * _resY;
-		_resX = max(1, _resX >> 1);
-		_resY = max(1, _resY >> 1);
+		_resX = max(1u, _resX >> 1);
+		_resY = max(1u, _resY >> 1);
 	}
 
 	// Add in the 1x1 mipmap level, which wasn't hit above. This could be done in the initializer of 

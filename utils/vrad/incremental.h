@@ -18,6 +18,7 @@
 #include "utlvector.h"
 #include "utlbuffer.h"
 #include "vrad.h"
+#include "tier0/threadtools.h"
 
 
 #define INCREMENTALFILE_VERSION	31241
@@ -59,7 +60,7 @@ public:
 
 public:
 
-	CRITICAL_SECTION	m_CS;
+	CThreadMutex	m_CS;
 
 	// This is the light for which m_LightFaces was built.
 	dworldlight_t	m_Light;

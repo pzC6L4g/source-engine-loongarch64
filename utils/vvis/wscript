@@ -1,0 +1,86 @@
+#! /usr/bin/env python
+# encoding: utf-8
+
+from waflib import Utils
+import os
+
+top = '.'
+PROJECT_NAME = 'vvis_dll'
+
+def options(opt):
+	# stub
+	return
+
+def configure(conf):
+	# stub
+	return
+
+
+def build(bld):
+	source = [
+		"../common/bsplib.cpp",
+		"../common/cmdlib.cpp",
+		"../../public/collisionutils.cpp",
+		"../../public/filesystem_helpers.cpp",
+		"flow.cpp",
+		"../../public/loadcmdline.cpp",
+		"../../public/lumpfiles.cpp",
+		"../common/pacifier.cpp",
+		"../../public/scratchpad3d.cpp",
+		"../common/scratchpad_helpers.cpp",
+		"../common/scriplib.cpp",
+		"../common/threads.cpp",
+		"../common/tools_minidump.cpp",
+		"vvis.cpp",
+		"WaterDist.cpp",
+		"../../public/zip_utils.cpp",
+		"../../public/filesystem_init.cpp",
+		"../../filesystem/linux_support.cpp",
+		"../common/filesystem_tools.cpp"
+	]
+
+	includes = [
+        '.',
+		'../common',
+        '../../public',
+        '../../public/tier0',
+        '../../public/tier1',
+        '../../public/mathlib',
+        '../../common',
+        '../../utils/common',
+        '../../utils/lzma',
+		'../../external/vpc/public'
+	]
+
+	defines = ['PROTECTED_THINGS_DISABLE']   # 不要 MPI
+
+	libs = [
+		'tier0',
+		'tier1',
+		'tier2',
+		'mathlib',
+		'vstdlib',
+		'lzma'
+	]
+
+	# linkflags = [
+	#     '-Wl,-rpath,' + bld.env.LIBDIR,   # 安装布局：库在 PREFIX/bin，例 /your/prefix/bin
+	#     '-Wl,-rpath,$ORIGIN/bin',         # 可执行文件所在目录下的 bin 子目录
+	#     '-Wl,-rpath,$ORIGIN',             # 库与可执行文件同目录时
+	# ],
+
+	install_path = bld.env.LIBDIR
+	bld.shlib(
+		source   = source,
+		target   = PROJECT_NAME,
+		name     = PROJECT_NAME,
+		features = 'c cxx',
+		includes = includes,
+		defines  = defines,
+		use      = libs,
+		install_path = install_path,
+		linkflags = '-Wl,-rpath,' + bld.env.LIBDIR,
+		subsystem = bld.env.MSVC_SUBSYSTEM,
+		idx      = bld.get_taskgen_count()
+	)
+

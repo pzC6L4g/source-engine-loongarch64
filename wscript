@@ -53,6 +53,7 @@ projects={
 		'dmxloader',
 		'engine',
 		'engine/voice_codecs/minimp3',
+		'fgdlib',#new lib
 		'filesystem',
 		'game/client',
 		'game/server',
@@ -66,12 +67,13 @@ projects={
 		'launcher',
 		'launcher_main',
 		'materialsystem',
-#		'materialsystem/shaderapiempty',
+		'materialsystem/shaderapiempty',
 		'materialsystem/shaderapidx9',
 		'materialsystem/shaderlib',
 		'materialsystem/stdshaders',
 		'mathlib',
 		'particles',
+		'raytrace',
 		'scenefilecache',
 		'serverbrowser',
 		'soundemittersystem',
@@ -91,9 +93,16 @@ projects={
 		'vpklib',
 		'vstdlib',
 		'vtf',
+		'utils/lzma',#new lib
+		'utils/vbsp',#new exe
 		'utils/vtex',
+		'utils/vvis',#new lib
+		'utils/vvis_launcher',#new exe
+		'utils/vrad',#new lib
+		'utils/vrad_launcher',#new exe
 		'unicode',
-		'video',
+		'video/video_bink'
+		# 'video/video_webm'
 	],
 	'tests': [
 		'appframework',
@@ -399,6 +408,10 @@ def check_deps(conf):
 				conf.check_cfg(package='libjpeg', uselib_store='JPEG', args=['--cflags', '--libs'])
 				conf.check_cfg(package='libpng', uselib_store='PNG', args=['--cflags', '--libs'])
 				conf.check_cfg(package='libcurl', uselib_store='CURL', args=['--cflags', '--libs'])
+				# ffmpeg lib
+				conf.check_cfg(package='libavcodec', uselib_store='AVCODEC', args=['--cflags', '--libs'])
+				conf.check_cfg(package='libavformat', uselib_store='AVFORMAT', args=['--cflags', '--libs'])
+				conf.check_cfg(package='libavutil', uselib_store='AVUTIL', args=['--cflags', '--libs'])
 			conf.check_cfg(package='zlib', uselib_store='ZLIB', args=['--cflags', '--libs'])
 
 			if conf.options.OPUS:
@@ -410,7 +423,7 @@ def check_deps(conf):
 		conf.check(lib='png', uselib_store='PNG', define_name='HAVE_PNG')
 		conf.check(lib='curl', uselib_store='CURL', define_name='HAVE_CURL')
 		conf.check(lib='z', uselib_store='ZLIB', define_name='HAVE_ZLIB')
-		if conf.env.DEST_CPU != 'aarch64':
+		if conf.env.DEST_CPU != 'aarch64' and not conf.env.DEST_CPU.startswith('loongarch'):
 			conf.check(lib='unwind', uselib_store='UNWIND')
 			conf.check(lib='crypto', uselib_store='CRYPTO')
 			conf.check(lib='ssl', uselib_store='SSL')
@@ -496,6 +509,28 @@ def configure(conf):
 	cflags, linkflags = conf.get_optimization_flags()
 
 
+	# waf's bundled c_config.py lacks a __loongarch__ -> 'loongarch64' entry in
+	# MACRO_TO_DEST_CPU, so on LoongArch DEST_CPU stays an empty list and the
+	# string concatenation below (and elsewhere) crashes. Fix it up here.
+	import platform
+	if not conf.env.DEST_CPU:
+		mach = platform.machine()
+		if mach.startswith('loongarch'):
+			conf.env.DEST_CPU = 'loongarch64'
+		else:
+			# cross-compile case: detect from the C compiler's target triple
+			try:
+				cc = conf.env.CC
+				cc0 = cc[0] if isinstance(cc, list) else cc
+				triple = conf.cmd_and_log([cc0, '-dumpmachine']).strip()
+				if 'loongarch' in triple:
+					conf.env.DEST_CPU = 'loongarch64'
+			except Exception:
+				pass
+	if not conf.env.DEST_OS:
+		conf.env.DEST_OS = platform.system().lower()
+
+
 	flags = []
 
 	if conf.options.SANITIZE:
@@ -525,6 +560,14 @@ def configure(conf):
 		flags += ['-mfpmath=sse']
 	elif conf.env.DEST_CPU in ['arm', 'aarch64']:
 		flags += ['-fsigned-char']
+	elif conf.env.DEST_CPU.startswith('loongarch'):
+		# Enable LoongArch LSX (128-bit) SIMD; add -mlasx to widen to LASX (256-bit)
+		flags += ['-mlsx', '-fsigned-char']
+		# LoongArch has no native 128-bit atomics; 128-bit CAS/LL-SC falls back to
+		# libatomic's lock-based implementation, so we must link it. Wrap with
+		# --no-as-needed because distro linkers default to --as-needed and would
+		# otherwise drop -latomic when it precedes the object needing the symbol.
+		linkflags += ['-Wl,--no-as-needed', '-latomic', '-Wl,--as-needed']
 
 	if conf.env.DEST_CPU == 'arm':
 		flags += ['-march=armv7-a', '-mfpu=neon-vfpv4']

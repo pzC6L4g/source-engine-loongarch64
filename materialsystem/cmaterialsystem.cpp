@@ -672,7 +672,8 @@ bool CMaterialSystem::Connect( CreateInterfaceFn factory )
 	g_pLauncherMgr = (ILauncherMgr *)factory( "SDLMgrInterface001" /*SDL_MGR_INTERFACE_VERSION*/, NULL );		
 	if ( !g_pLauncherMgr )
 	{
-		return false;
+		Warning( "MaterialSystem: SDL launcher manager not present (headless); continuing without window management.\n" );
+		// return false;
 	}
 #endif // USE_SDL
 #endif // !DEDICATED

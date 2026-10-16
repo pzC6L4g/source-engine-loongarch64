@@ -11,14 +11,15 @@
 #include "utlvector.h"
 #include "bspfile.h"
 #include "gamebspfile.h"
-#include "VPhysics_Interface.h"
-#include "Studio.h"
+#include "vphysics_interface.h"
+#include "studio.h"
 #include "byteswap.h"
-#include "UtlBuffer.h"
-#include "CollisionUtils.h"
+#include "utlbuffer.h"
+#include "collisionutils.h"
 #include <float.h>
-#include "CModel.h"
-#include "PhysDll.h"
+#include <ctype.h>
+#include "cmodel.h"
+#include "physdll.h"
 #include "utlsymbol.h"
 #include "tier1/strtools.h"
 #include "KeyValues.h"
@@ -27,6 +28,11 @@ static void SetCurrentModel( studiohdr_t *pStudioHdr );
 static void FreeCurrentModelVertexes();
 
 IPhysicsCollision *s_pPhysCollision = NULL;
+
+// Cached pointer to the loaded .vvd vertex data for the current model.
+// studiohdr_t no longer carries a pVertexBase/pIndexBase field in this engine
+// version, so we cache it here instead of storing it on the studio header.
+static void *g_pActiveVertexBase = NULL;
 
 //-----------------------------------------------------------------------------
 // These puppies are used to construct the game lumps
@@ -182,9 +188,8 @@ bool LoadStudioModel( char const* pModelName, char const* pEntityType, CUtlBuffe
 		return false;
 	}
 
-	// ensure reset
-	pHdr->pVertexBase = NULL;
-	pHdr->pIndexBase  = NULL;
+	// ensure reset (studiohdr_t no longer stores pVertexBase/pIndexBase in this engine version)
+	g_pActiveVertexBase = NULL;
 
 	return true;
 }
@@ -247,7 +252,11 @@ static CPhysCollide* GetCollisionModel( char const* pModelName )
 	// Convert to a common string
 	char* pTemp = (char*)_alloca(strlen(pModelName) + 1);
 	strcpy( pTemp, pModelName );
-	_strlwr( pTemp );
+	// _strlwr is MSVC-only; convert to lowercase portably
+	for ( char *p = pTemp; *p; ++p )
+	{
+		*p = (char)tolower( (unsigned char)*p );
+	}
 
 	char* pSlash = strchr( pTemp, '\\' );
 	while( pSlash )
@@ -692,10 +701,10 @@ static void FreeCurrentModelVertexes()
 {
 	Assert( g_pActiveStudioHdr );
 
-	if ( g_pActiveStudioHdr->pVertexBase )
+	if ( g_pActiveVertexBase )
 	{
-		free( g_pActiveStudioHdr->pVertexBase );
-		g_pActiveStudioHdr->pVertexBase = NULL;
+		free( g_pActiveVertexBase );
+		g_pActiveVertexBase = NULL;
 	}
 }
 
@@ -708,9 +717,9 @@ const vertexFileHeader_t * mstudiomodel_t::CacheVertexData( void * pModelData )
 	Assert( pModelData == NULL );
 	Assert( g_pActiveStudioHdr );
 
-	if ( g_pActiveStudioHdr->pVertexBase )
+	if ( g_pActiveVertexBase )
 	{
-		return (vertexFileHeader_t *)g_pActiveStudioHdr->pVertexBase;
+		return (vertexFileHeader_t *)g_pActiveVertexBase;
 	}
 
 	// mandatory callback to make requested data resident
@@ -753,7 +762,7 @@ const vertexFileHeader_t * mstudiomodel_t::CacheVertexData( void * pModelData )
 		Error("Error Vertex File %s checksum %d should be %d\n", fileName, pVvdHdr->checksum, g_pActiveStudioHdr->checksum);
 	}
 
-	g_pActiveStudioHdr->pVertexBase = (void*)pVvdHdr;
+	g_pActiveVertexBase = (void*)pVvdHdr;
 	return pVvdHdr;
 }
 

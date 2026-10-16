@@ -13,6 +13,11 @@
 #include "lightmap.h"
 #include "threads.h"
 
+#if !defined( _WIN32 )
+#include <unistd.h>
+#include <stdlib.h>
+#endif
+
 
 static CUtlVector<unsigned char> g_LastGoodLightData;
 static CUtlVector<unsigned char> g_FacesTouched;
@@ -170,8 +175,17 @@ void CVRadDLL::GetBSPInfo( CBSPInfo *pInfo )
 bool CVRadDLL::DoIncrementalLight( char const *pVMFFile )
 {
 	char tempPath[MAX_PATH], tempFilename[MAX_PATH];
+#ifdef _WIN32
 	GetTempPath( sizeof( tempPath ), tempPath );
 	GetTempFileName( tempPath, "vmf_entities_", 0, tempFilename );
+#else
+	const char *pTmpDir = getenv( "TMPDIR" );
+	if ( !pTmpDir )
+	{
+		pTmpDir = "/tmp";
+	}
+	Q_snprintf( tempFilename, sizeof( tempFilename ), "%s/vmf_entities_%d.tmp", pTmpDir, (int)getpid() );
+#endif
 
 	FileHandle_t fp = g_pFileSystem->Open( tempFilename, "wb" );
 	if( !fp )

@@ -37,5 +37,7 @@ void VGUI_DestroyClientDLLRootPanel( void )
 //-----------------------------------------------------------------------------
 vgui::VPANEL VGui_GetClientDLLRootPanel( void )
 {
+	// vgui::VPANEL root = enginevgui->GetPanel( PANEL_CLIENTDLL );
+	// return root;
 	return g_pCSRootPanel->GetVPanel();
 }

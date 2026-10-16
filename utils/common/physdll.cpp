@@ -14,7 +14,11 @@ CreateInterfaceFn GetPhysicsFactory( void )
 {
 	if ( !pPhysicsModule )
 	{
+#ifdef _WIN32
 		pPhysicsModule = g_pFullFileSystem->LoadModule( "VPHYSICS.DLL" );
+#else
+		pPhysicsModule = g_pFullFileSystem->LoadModule( "vphysics" );
+#endif
 		if ( !pPhysicsModule )
 			return NULL;
 	}

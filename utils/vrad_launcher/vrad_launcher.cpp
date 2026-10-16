@@ -9,11 +9,16 @@
 //
 
 #include "stdafx.h"
+#ifdef _WIN32
 #include <direct.h>
+#else
+#include <unistd.h>
+#endif
 #include "tier1/strtools.h"
 #include "tier0/icommandline.h"
 
 
+#ifdef _WIN32
 char* GetLastErrorString()
 {
 	static char err[2048];
@@ -38,6 +43,31 @@ char* GetLastErrorString()
 
 	return err;
 }
+#else // POSIX / Linux
+#include <dlfcn.h>
+#include <string.h>
+#include <errno.h>
+
+char* GetLastErrorString()
+{
+	static char err[2048];
+
+	// Prefer the dynamic loader's message (set by Sys_LoadModule -> dlopen).
+	const char *pErr = dlerror();
+	if ( pErr && *pErr )
+	{
+		Q_strncpy( err, pErr, sizeof( err ) );
+	}
+	else
+	{
+		Q_strncpy( err, strerror( errno ), sizeof( err ) );
+	}
+
+	err[ sizeof( err ) - 1 ] = 0;
+
+	return err;
+}
+#endif
 
 
 void MakeFullPath( const char *pIn, char *pOut, int outLen )
@@ -49,7 +79,11 @@ void MakeFullPath( const char *pIn, char *pOut, int outLen )
 	}
 	else
 	{
+#ifdef _WIN32
 		_getcwd( pOut, outLen );
+#else
+		getcwd( pOut, outLen );
+#endif
 		Q_strncat( pOut, "\\", outLen, COPY_ALL_CHARACTERS );
 		Q_strncat( pOut, pIn, outLen, COPY_ALL_CHARACTERS );
 	}

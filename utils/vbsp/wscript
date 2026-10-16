@@ -1,0 +1,136 @@
+#! /usr/bin/env python
+# encoding: utf-8
+
+from waflib import Utils
+import os
+
+top = '.'
+PROJECT_NAME = 'vbsp'
+
+def options(opt):
+	# stub
+	return
+
+def configure(conf):
+	# stub
+	return
+
+
+def build(bld):
+	source = [
+		'boundbox.cpp',
+		'brushbsp.cpp',
+		'../../public/collisionutils.cpp',
+		'csg.cpp',
+		'cubemap.cpp',
+		'detail.cpp',
+		'detailobjects.cpp',
+		'../../public/disp_common.cpp',
+		'disp_ivp.cpp',
+		'../../public/disp_powerinfo.cpp',
+		'disp_vbsp.cpp',
+		'faces.cpp',
+		'glfile.cpp',
+		'ivp.cpp',
+		'leakfile.cpp',
+		'../../public/loadcmdline.cpp',
+		'../../public/lumpfiles.cpp',
+		'map.cpp',
+		'manifest.cpp',
+		'materialpatch.cpp',
+		'materialsub.cpp',
+		'../common/mstristrip.cpp',
+		'nodraw.cpp',
+		'normals.cpp',
+		'overlay.cpp',
+		'../common/physdll.cpp',
+		'portals.cpp',
+		'prtfile.cpp',
+		'../../public/scratchpad3d.cpp',
+		'../common/scratchpad_helpers.cpp',
+		'staticprop.cpp',
+		'textures.cpp',
+		'tree.cpp',
+		'../common/utilmatlib.cpp',
+		'vbsp.cpp',
+		'worldvertextransitionfixup.cpp',
+		'writebsp.cpp',
+		'../../public/zip_utils.cpp',
+		'../common/bsplib.cpp',
+		'../../public/builddisp.cpp',
+		'../../public/chunkfile.cpp',
+		'../common/cmdlib.cpp',
+		'../../public/filesystem_helpers.cpp',
+		'../../public/filesystem_init.cpp',
+		'../common/filesystem_tools.cpp',
+		'../common/map_shared.cpp',
+		'../common/pacifier.cpp',
+		'../common/polylib.cpp',
+		'../common/scriplib.cpp',
+		'../../filesystem/linux_support.cpp',
+		'../common/threads.cpp',
+		'../common/tools_minidump.cpp'
+		# '../../fgdlib/gamedata.cpp',
+		# '../../fgdlib/gdclass.cpp',
+		# '../../fgdlib/gdvar.cpp',
+		# '../../fgdlib/inputoutput.cpp',
+		# '../../fgdlib/wckeyvalues.cpp'
+	]
+
+	includes = [
+        '.',
+        '../../public',
+        '../../public/tier0',
+        '../../public/tier1',
+        '../../public/mathlib',
+        '../../common',
+        '../../bitmap',
+        '../../vtf',
+        '../../utils/lzma',
+        '../../utils/common',
+		'../../external/vpc/public',
+		# '../../public/fgdlib'
+	]
+
+	defines = []
+
+	libs = [
+		'tier0',
+		'tier1',
+		'tier2',
+		'mathlib',
+		'vstdlib',
+		'vtf',
+		'bitmap',
+		'fgdlib',
+		'lzma'
+	]
+
+	# linkflags = [
+	#     '-Wl,-rpath,' + bld.env.LIBDIR,   # 安装布局：库在 PREFIX/bin，例 /your/prefix/bin
+	#     '-Wl,-rpath,$ORIGIN/bin',         # 可执行文件所在目录下的 bin 子目录
+	#     '-Wl,-rpath,$ORIGIN',             # 库与可执行文件同目录时
+	# ],
+
+	install_path = bld.env.LIBDIR
+
+	link_flags = [
+		'-Wl,-rpath,' + bld.env.LIBDIR,
+		'-Wl,--enable-new-dtags',
+		'-Wl,-rpath,$$ORIGIN',
+	]
+
+	bld(
+		source   = source,
+		target   = PROJECT_NAME,
+		name     = PROJECT_NAME,
+		features = 'c cxx cxxprogram',
+		includes = includes,
+		defines  = defines,
+		use      = libs,
+		install_path = install_path,
+		linkflags = link_flags,
+		subsystem = bld.env.MSVC_SUBSYSTEM,
+		idx      = bld.get_taskgen_count()
+	)
+

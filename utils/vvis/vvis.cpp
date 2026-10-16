@@ -7,17 +7,28 @@
 //=============================================================================//
 // vis.c
 
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #include "vis.h"
 #include "threads.h"
 #include "stdlib.h"
 #include "pacifier.h"
+#ifdef MPI
 #include "vmpi.h"
 #include "mpivis.h"
+#include "vmpi_tools_shared.h"
+#else
+// Non-MPI builds don't link the VMPI library, so provide locally the few
+// symbols vvis.cpp references. They are only ever consulted in non-MPI paths.
+static bool g_bUseMPI = false;
+static bool g_bMPIMaster = false;
+inline void VVIS_SetupMPI( int &argc, char **&argv ) {}
+inline const char *ExpandPath( const char *pPath ) { return pPath; }
+#endif
 #include "tier1/strtools.h"
 #include "collisionutils.h"
 #include "tier0/icommandline.h"
-#include "vmpi_tools_shared.h"
 #include "ilaunchabledll.h"
 #include "tools_minidump.h"
 #include "loadcmdline.h"
@@ -302,11 +313,13 @@ void CalcPortalVis (void)
 	}
 
 
+#ifdef MPI
     if (g_bUseMPI) 
 	{
  		RunMPIPortalFlow();
 	}
 	else 
+#endif
 	{
 		RunThreadsOnIndividual (g_numportals*2, true, PortalFlow);
 	}
@@ -331,11 +344,13 @@ void CalcVis (void)
 {
 	int		i;
 
+#ifdef MPI
 	if (g_bUseMPI) 
 	{
 		RunMPIBasePortalVis();
 	}
 	else 
+#endif
 	{
 	    RunThreadsOnIndividual (g_numportals*2, true, BasePortalVis);
 	}
@@ -414,6 +429,7 @@ void LoadPortals (char *name)
 	FILE *f;
 
 	// Open the portal file.
+#ifdef MPI
 	if ( g_bUseMPI )
 	{
 		// If we're using MPI, copy off the file to a temporary first. This will download the file
@@ -448,6 +464,7 @@ void LoadPortals (char *name)
 		f = fopen( tempFile, "rSTD" ); // read only, sequential, temporary, delete on close
 	}
 	else
+#endif
 	{
 		f = fopen( name, "r" );
 	}
@@ -1114,7 +1131,10 @@ int RunVVis( int argc, char **argv )
 	{
 		// Setup the logfile.
 		char logFile[512];
-		_snprintf( logFile, sizeof(logFile), "%s.log", source );
+		// snprintf( logFile, sizeof(logFile), "%s.log", source );
+		V_strncpy( logFile, argv[ argc - 1 ], sizeof( logFile ) );
+		V_StripExtension( logFile, logFile, sizeof( logFile ) );
+		V_strncat( logFile, ".log", sizeof( logFile ) );
 		SetSpewFunctionLogFile( logFile );
 	}
 
@@ -1224,9 +1244,11 @@ int main (int argc, char **argv)
 	VVIS_SetupMPI( argc, argv );
 
 	// Install an exception handler.
+#ifdef MPI
 	if ( g_bUseMPI && !g_bMPIMaster )
 		SetupToolsMinidumpHandler( VMPI_ExceptionFilter );
 	else
+#endif
 		SetupDefaultToolsMinidumpHandler();
 
 	return RunVVis( argc, argv );

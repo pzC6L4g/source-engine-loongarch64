@@ -20,6 +20,9 @@
 #if defined(__i386__) || defined(_M_IX86)
 // For MMX intrinsics
 #include <xmmintrin.h>
+#elif defined(__loongarch__)
+// SSE -> LSX translation layer (mirrors sse2neon.h); provides the _mm_* intrinsics
+#include "sse2lsx.h"
 #endif
 
 // XXX remove me
@@ -1201,7 +1204,12 @@ FORCEINLINE int RoundFloatToInt(float f)
 	};
 	flResult = __fctiw( f );
 	return pResult[1];
-#elif defined (__arm__) ||  defined (__aarch64__)
+#elif defined (__arm__) || defined (__aarch64__) || defined (__loongarch__)
+	// Use round-half-up to stay consistent with the rest of the engine. Using
+	// _mm_cvtss_si32 on LoongArch would route through __lsx_vftint.w.s, which
+	// honours the FCSR rounding mode (round-to-nearest-even) and diverges from
+	// this on exact .5 values (e.g. 0.5 -> 0 instead of 1), shifting Panorama
+	// pixel-alignment and pushing UI text off-screen.
         return (int)(f + 0.5f);
 #else
 #error Unknown architecture
@@ -1253,21 +1261,26 @@ FORCEINLINE unsigned long RoundFloatToUnsignedLong(float f)
 	}
 	return nRet;
 #else // PLATFORM_WINDOWS_PC64
-	unsigned char nResult[8];
+	#if defined( __arm__ ) || defined( __aarch64__ ) || defined( __loongarch__ )
+		// No x87 FPU on these targets; round to nearest via standard C.
+		return (unsigned long)( f + 0.5f );
+	#else
+		unsigned char nResult[8];
 
-	#if defined( _WIN32 )
-		__asm
-		{
-			fld f
-			fistp       qword ptr nResult
-		}
-	#elif POSIX
-		__asm __volatile__ (
-			"fistpl %0;": "=m" (nResult): "t" (f) : "st"
-		);
-	#endif
+		#if defined( _WIN32 )
+			__asm
+			{
+				fld f
+				fistp       qword ptr nResult
+			}
+		#elif POSIX
+			__asm __volatile__ (
+				"fistpl %0;": "=m" (nResult): "t" (f) : "st"
+			);
+		#endif
 
 		return *((unsigned long*)nResult);
+	#endif
 #endif // PLATFORM_WINDOWS_PC64
 #endif // !X360
 }
@@ -1298,7 +1311,7 @@ FORCEINLINE int Float2Int( float a )
 inline int Floor2Int( float a )
 {
 	int RetVal;
-#if defined( __i386__ )
+#if defined( __i386__ ) || defined( __loongarch__ )
 	// Convert to int and back, compare, subtract one if too big
 	__m128 a128 = _mm_set_ss(a);
 	RetVal = _mm_cvtss_si32(a128);
@@ -1315,7 +1328,7 @@ inline int Floor2Int( float a )
 //-----------------------------------------------------------------------------
 FORCEINLINE unsigned int FastFToC( float c )
 {
-#if defined( __i386__ )
+#if defined( __i386__ ) || defined( __loongarch__ )
 	// IEEE float bit manipulation works for values between [0, 1<<23)
 	union { float f; int i; } convert = { c*255.0f + (float)(1<<23) };
 	return convert.i & 255;
@@ -1330,7 +1343,7 @@ FORCEINLINE unsigned int FastFToC( float c )
 //-----------------------------------------------------------------------------
 FORCEINLINE int FastFloatToSmallInt( float c )
 {
-#if defined( __i386__ )
+#if defined( __i386__ ) || defined( __loongarch__ )
 	// IEEE float bit manipulation works for values between [-1<<22, 1<<22)
 	union { float f; int i; } convert = { c + (float)(3<<22) };
 	return (convert.i & ((1<<23)-1)) - (1<<22);
@@ -1355,7 +1368,7 @@ inline float ClampToMsec( float in )
 inline int Ceil2Int( float a )
 {
    int RetVal;
-#if defined( __i386__ )
+#if defined( __i386__ ) || defined( __loongarch__ )
    // Convert to int and back, compare, add one if too small
    __m128 a128 = _mm_load_ss(&a);
    RetVal = _mm_cvtss_si32(a128);

@@ -8,6 +8,9 @@
 
 #if defined( _X360 )
 #include <xboxmath.h>
+#elif defined(__loongarch__)
+// SSE -> LoongArch LSX translation layer (mirrors sse2neon.h for ARM)
+#include "sse2lsx.h"
 #elif defined(__arm__) || defined(__aarch64__)
 #include "sse2neon.h"
 #else
